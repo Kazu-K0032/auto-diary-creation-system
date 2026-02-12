@@ -53,14 +53,18 @@ function summarizeWithOpenAI(text) {
  * @param {Array} summaries
  */
 function createDiaryPageFromSummaries(summaries) {
-  const diaryTitle = formatDiaryTitle(new Date());
+  const diaryDateText = formatDiaryTitle(new Date());
+  const diaryPageTitle = "【" + diaryDateText + "】今日の日記";
   const diaryBlocks = buildDiaryBlocks({
-    dateText: diaryTitle,
-    summaries: summaries
+    pageTitle: diaryPageTitle,
+    dateText: diaryDateText,
+    focusText: "",
+    newDocs: [],
+    updatedDocs: summaries || []
   });
 
   createDiaryPage({
-    title: diaryTitle,
+    title: diaryPageTitle,
     blocks: diaryBlocks
   });
 }

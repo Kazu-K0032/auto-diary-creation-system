@@ -2,18 +2,20 @@
  * 日次日記作成ユースケース
  */
 function executeDailyDiary() {
-  const yesterdayIsoString = new Date(
+  const thresholdIsoString = new Date(
     Date.now() - 24 * 60 * 60 * 1000
   ).toISOString();
+  const thresholdDate = new Date(thresholdIsoString);
 
-  const pages = searchPagesUpdatedAfter(yesterdayIsoString);
+  const pages = searchPagesUpdatedAfter(thresholdIsoString);
   Logger.log("[executeDailyDiary] 取得ページ数: " + pages.length);
   if (pages.length === 0) {
     Logger.log("[executeDailyDiary] 更新ページなし");
     return;
   }
 
-  const summaries = [];
+  const newDocs = [];
+  const updatedDocs = [];
   pages.forEach(page => {
     if (isDiaryDatabasePage(page)) {
       return;
@@ -26,31 +28,65 @@ function executeDailyDiary() {
     }
 
     Logger.log("[executeDailyDiary] 要約開始: pageId=" + page.id);
-    const summary = summarizeTextForDiary(content);
+    const pageTitle = getPageTitle(page);
+    const promptInput =
+      "タイトル: " +
+      pageTitle +
+      "\n" +
+      "URL: " +
+      page.url +
+      "\n" +
+      "\n" +
+      "本文:\n" +
+      content;
+    const summary = summarizeTextForDiary(promptInput);
     Logger.log("[executeDailyDiary] 要約完了: pageId=" + page.id + ", length=" + summary.length);
-    summaries.push({
-      title: getPageTitle(page),
+    const item = {
+      title: pageTitle,
       url: page.url,
       summary: summary
-    });
+    };
+
+    const createdTime = page.created_time ? new Date(page.created_time) : null;
+    const isNewDoc = createdTime ? createdTime >= thresholdDate : false;
+    if (isNewDoc) {
+      newDocs.push(item);
+    } else {
+      updatedDocs.push(item);
+    }
   });
 
-  Logger.log("[executeDailyDiary] 要約件数: " + summaries.length);
-  if (summaries.length === 0) {
+  const totalSummaries = newDocs.length + updatedDocs.length;
+  Logger.log("[executeDailyDiary] 要約件数: " + totalSummaries);
+  if (totalSummaries === 0) {
     Logger.log("[executeDailyDiary] 有効な要約がないためページ作成をスキップ");
     return;
   }
 
-  const diaryTitle = formatDiaryTitle(new Date());
-  Logger.log("[executeDailyDiary] 日記タイトル生成: " + diaryTitle);
+  const allDocs = [].concat(newDocs).concat(updatedDocs);
+  let focusText = "";
+  try {
+    focusText = generateDailyFocusFromItems(allDocs);
+  } catch (error) {
+    const errorMessage = error && error.stack ? error.stack : String(error);
+    Logger.log("[executeDailyDiary] 主題生成に失敗: " + errorMessage);
+    focusText = "";
+  }
+
+  const diaryDateText = formatDiaryTitle(new Date());
+  const diaryPageTitle = "【" + diaryDateText + "】今日の日記";
+  Logger.log("[executeDailyDiary] 日記タイトル生成: " + diaryPageTitle);
   const diaryBlocks = buildDiaryBlocks({
-    dateText: diaryTitle,
-    summaries: summaries
+    pageTitle: diaryPageTitle,
+    dateText: diaryDateText,
+    focusText: focusText,
+    newDocs: newDocs,
+    updatedDocs: updatedDocs
   });
 
   Logger.log("[executeDailyDiary] Notionページ作成開始");
   createDiaryPage({
-    title: diaryTitle,
+    title: diaryPageTitle,
     blocks: diaryBlocks
   });
   Logger.log("[executeDailyDiary] Notionページ作成完了");
@@ -62,7 +98,13 @@ function executeDailyDiary() {
  * @returns {boolean}
  */
 function isDiaryDatabasePage(page) {
-  return page.parent && page.parent.database_id === DIARY_DB_ID;
+  const parentDbId =
+    page && page.parent && page.parent.database_id
+      ? String(page.parent.database_id)
+      : "";
+  const normalizedParentDbId = parentDbId.replace(/-/g, "").toLowerCase();
+  const normalizedDiaryDbId = String(DIARY_DB_ID).replace(/-/g, "").toLowerCase();
+  return normalizedParentDbId && normalizedParentDbId === normalizedDiaryDbId;
 }
 
 /**
