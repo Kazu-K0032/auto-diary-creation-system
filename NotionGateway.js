@@ -12,7 +12,7 @@ function buildNotionHeaders() {
 
 /**
  * 指定日時以降に更新されたページを検索
- * @param {string} isoDateString
+ * @param {string} isoDateString 閾値となるISO 8601形式の日時文字列（この日時以降に更新されたページを抽出）
  * @returns {Array}
  */
 function searchPagesUpdatedAfter(isoDateString) {
@@ -23,6 +23,10 @@ function searchPagesUpdatedAfter(isoDateString) {
     }
   };
 
+  /** 
+   * @see https://developers.google.com/apps-script/reference/url-fetch/url-fetch-app?hl=ja Class UrlFetchApp
+   * @see https://developers.notion.com/reference/post-search#search-by-title Notion APIの検索エンドポイント
+   */
   const response = UrlFetchApp.fetch("https://api.notion.com/v1/search", {
     method: "post",
     headers: buildNotionHeaders(),
@@ -31,19 +35,17 @@ function searchPagesUpdatedAfter(isoDateString) {
 
   const results = JSON.parse(response.getContentText()).results || [];
   const threshold = new Date(isoDateString);
+  // 過去〇時間以内に更新されたページを取得
   const filtered = results.filter(page => {
     if (!page || !page.last_edited_time) return false;
     return new Date(page.last_edited_time) >= threshold;
   });
-  Logger.log(
-    "[NotionGateway.searchPagesUpdatedAfter] 条件一致ページ数: " + filtered.length
-  );
   return filtered;
 }
 
 /**
  * ページの子ブロックを取得
- * @param {string} pageId
+ * @param {string} pageId 取得対象のNotionページID
  * @returns {Array}
  */
 function fetchPageChildren(pageId) {
@@ -59,8 +61,8 @@ function fetchPageChildren(pageId) {
 }
 
 /**
- * ページ本文をプレーンテキストとして取得（最大1000文字）
- * @param {string} pageId
+ * ページ本文をプレーンテキストとして取得
+ * @param {string} pageId 取得対象のNotionページID
  * @returns {string}
  */
 function fetchPageContentText(pageId) {
@@ -77,17 +79,19 @@ function fetchPageContentText(pageId) {
     }
   });
 
-  const content = text.substring(0, 1000);
+  // 最大x文字に切り捨て(本文を短く切ってOpenAIに渡すための任意の上限)
+  const maxLength = 2000;
+  const content = text.substring(0, maxLength);
   return content;
 }
 
 /**
  * 日記DBにページを作成
- * @param {{ title: string, blocks: Array }} params
+ * @param {{ title: string, blocks: Array }} params 作成する日記ページの情報（title: タイトル、blocks: Notionの子ブロック配列）
  */
 function createDiaryPage(params) {
   Logger.log(
-    "[NotionGateway.createDiaryPage] リクエスト送信: title=" +
+    "[NotionGateway.createDiaryPage関数] リクエスト送信: title=" +
       params.title +
       ", blocks=" +
       params.blocks.length
@@ -107,12 +111,10 @@ function createDiaryPage(params) {
     ]
   };
 
-  const response = UrlFetchApp.fetch("https://api.notion.com/v1/pages", {
+  /** @see https://developers.notion.com/reference/post-page Notion APIのページ作成エンドポイント */
+  UrlFetchApp.fetch("https://api.notion.com/v1/pages", {
     method: "post",
     headers: buildNotionHeaders(),
     payload: JSON.stringify(body)
   });
-  Logger.log(
-    "[NotionGateway.createDiaryPage] レスポンス受信: status=" + response.getResponseCode()
-  );
 }

@@ -1,6 +1,6 @@
 /**
  * スクリプトプロパティから必須値を取得する
- * @param {string} key
+ * @param {string} key 取得対象のスクリプトプロパティのキー名
  * @returns {string}
  */
 function getRequiredScriptProperty(key) {
@@ -94,3 +94,9 @@ const DIARY_TIMEZONE = "Asia/Tokyo";
  * @type {string}
  */
 const DIARY_DATE_FORMAT = "yyyy年M月d日";
+
+/**
+ * 過去〇時間以内に更新されたページを取得する
+ * @type {number}
+ */
+const UPDATE_TIME_THRESHOLD_HOURS = 24;

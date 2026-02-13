@@ -1,6 +1,6 @@
 /**
  * 日付文字列を日記タイトル用にフォーマット
- * @param {Date} date
+ * @param {Date} date フォーマット対象の日付
  * @returns {string}
  */
 function formatDiaryTitle(date) {
@@ -9,7 +9,7 @@ function formatDiaryTitle(date) {
 
 /**
  * 日記ページ用のNotionブロックを生成
- * @param {{ pageTitle: string, dateText: string, focusText: string, newDocs: Array, updatedDocs: Array }} params
+ * @param {{ pageTitle: string, dateText: string, focusText: string, newDocs: Array, updatedDocs: Array }} params 日記ページの生成に必要な情報
  * @returns {Array}
  */
 function buildDiaryBlocks(params) {

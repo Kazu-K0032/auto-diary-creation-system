@@ -2,19 +2,22 @@
  * 日次日記作成ユースケース
  */
 function executeDailyDiary() {
+  // 過去〇時間以内に更新されたページを取得
   const thresholdIsoString = new Date(
-    Date.now() - 24 * 60 * 60 * 1000
+    Date.now() - UPDATE_TIME_THRESHOLD_HOURS * 60 * 60 * 1000
   ).toISOString();
   const thresholdDate = new Date(thresholdIsoString);
 
   const pages = searchPagesUpdatedAfter(thresholdIsoString);
-  Logger.log("[executeDailyDiary] 取得ページ数: " + pages.length);
+  Logger.log("[executeDailyDiary関数] 取得ページ数: " + pages.length);
   if (pages.length === 0) {
-    Logger.log("[executeDailyDiary] 更新ページなし");
+    Logger.log("[executeDailyDiary関数] 更新ページなし");
     return;
   }
 
+  // 新規作成されたページを格納するリスト
   const newDocs = [];
+  // 更新されたページを格納するリスト
   const updatedDocs = [];
   pages.forEach(page => {
     if (isDiaryDatabasePage(page)) {
@@ -22,12 +25,12 @@ function executeDailyDiary() {
     }
 
     const content = fetchPageContentText(page.id);
-    Logger.log("[executeDailyDiary] 本文取得完了: pageId=" + page.id + ", length=" + content.length);
+    Logger.log("[executeDailyDiary関数] 本文取得完了: pageId=" + page.id + ", length=" + content.length);
     if (!content) {
       return;
     }
 
-    Logger.log("[executeDailyDiary] 要約開始: pageId=" + page.id);
+    Logger.log("[executeDailyDiary関数] 要約開始: pageId=" + page.id);
     const pageTitle = getPageTitle(page);
     const promptInput =
       "タイトル: " +
@@ -40,7 +43,7 @@ function executeDailyDiary() {
       "本文:\n" +
       content;
     const summary = summarizeTextForDiary(promptInput);
-    Logger.log("[executeDailyDiary] 要約完了: pageId=" + page.id + ", length=" + summary.length);
+    Logger.log("[executeDailyDiary関数] 要約完了: pageId=" + page.id + ", length=" + summary.length);
     const item = {
       title: pageTitle,
       url: page.url,
@@ -57,9 +60,9 @@ function executeDailyDiary() {
   });
 
   const totalSummaries = newDocs.length + updatedDocs.length;
-  Logger.log("[executeDailyDiary] 要約件数: " + totalSummaries);
+  Logger.log("[executeDailyDiary関数] 要約件数: " + totalSummaries);
   if (totalSummaries === 0) {
-    Logger.log("[executeDailyDiary] 有効な要約がないためページ作成をスキップ");
+    Logger.log("[executeDailyDiary関数] 有効な要約がないためページ作成をスキップ");
     return;
   }
 
@@ -69,13 +72,13 @@ function executeDailyDiary() {
     focusText = generateDailyFocusFromItems(allDocs);
   } catch (error) {
     const errorMessage = error && error.stack ? error.stack : String(error);
-    Logger.log("[executeDailyDiary] 主題生成に失敗: " + errorMessage);
+    Logger.log("[executeDailyDiary関数] 主題生成に失敗: " + errorMessage);
     focusText = "";
   }
 
   const diaryDateText = formatDiaryTitle(new Date());
   const diaryPageTitle = "【" + diaryDateText + "】今日の日記";
-  Logger.log("[executeDailyDiary] 日記タイトル生成: " + diaryPageTitle);
+  Logger.log("[executeDailyDiary関数] 日記タイトル生成: " + diaryPageTitle);
   const diaryBlocks = buildDiaryBlocks({
     pageTitle: diaryPageTitle,
     dateText: diaryDateText,
@@ -84,35 +87,59 @@ function executeDailyDiary() {
     updatedDocs: updatedDocs
   });
 
-  Logger.log("[executeDailyDiary] Notionページ作成開始");
+  Logger.log("[executeDailyDiary関数] Notionページ作成開始");
   createDiaryPage({
     title: diaryPageTitle,
     blocks: diaryBlocks
   });
-  Logger.log("[executeDailyDiary] Notionページ作成完了");
+  Logger.log("[executeDailyDiary関数] Notionページ作成完了");
 }
 
 /**
  * 指定ページが日記DBに属するか判定する
- * @param {Object} page
+ * @param {Object} page Notionのページオブジェクト
  * @returns {boolean}
  */
 function isDiaryDatabasePage(page) {
+  // ページの親データベースIDを取得
   const parentDbId =
     page && page.parent && page.parent.database_id
       ? String(page.parent.database_id)
       : "";
+  // データベースIDからハイフンを削除して小文字に変換
   const normalizedParentDbId = parentDbId.replace(/-/g, "").toLowerCase();
+  // 日記DBのデータベースIDからハイフンを削除して小文字に変換
   const normalizedDiaryDbId = String(DIARY_DB_ID).replace(/-/g, "").toLowerCase();
+  // データベースIDが一致する場合はtrueを返す
   return normalizedParentDbId && normalizedParentDbId === normalizedDiaryDbId;
 }
 
 /**
  * Notionページオブジェクトからタイトル文字列を取得する
- * @param {Object} page
+ * @param {Object} page Notionのページオブジェクト
  * @returns {string}
  */
 function getPageTitle(page) {
-  const prop = Object.values(page.properties || {}).find(p => p.type === "title");
-  return prop && prop.title && prop.title[0] ? prop.title[0].plain_text : "無題";
+  const defaultTitle = "無題";
+  // ページオブジェクトが存在しない場合
+  if (!page || !page.properties) {
+    return defaultTitle;
+  }
+
+  // タイトル型プロパティを探す
+  const propertyList = Object.values(page.properties);
+  const titleProperty = propertyList.find(property => property.type === "title");
+
+  // タイトル型プロパティが存在し、タイトルが存在する場合
+  if (
+    titleProperty &&
+    Array.isArray(titleProperty.title) &&
+    titleProperty.title.length > 0 &&
+    titleProperty.title[0].plain_text
+  ) {
+    // タイトルを返す
+    return titleProperty.title[0].plain_text;
+  }
+
+  return defaultTitle;
 }

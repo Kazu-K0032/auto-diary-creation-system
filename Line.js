@@ -3,7 +3,7 @@
  * @param {string} body - 通知する本文内容
  */
 function send2Line(body) {
-    Logger.log("[Line.send2Line] リクエスト送信: messageLength=" + body.length);
+    Logger.log("[Line.send2Line関数] リクエスト送信: messageLength=" + body.length);
     const token = LINE_API;
 
     const endpoint = 'https://api.line.me/v2/bot/message/broadcast';
@@ -24,15 +24,16 @@ function send2Line(body) {
     const response = UrlFetchApp.fetch(endpoint, options);
     const code = response.getResponseCode();
     if (code < 200 || code >= 300) {
-        Logger.log("[Line.send2Line] 送信失敗: " + response.getContentText());
+        Logger.log("[Line.send2Line関数] 送信失敗: " + response.getContentText());
     } else {
-        Logger.log("[Line.send2Line] 送信成功");
+        Logger.log("[Line.send2Line関数] 送信成功");
     }
 }
 
 /**
  * LINE通知の疎通確認用関数
  */
-function test() {
-    send2Line("test");
+function testSend2Line() {
+    const message = "test";
+    send2Line(message);
 }
