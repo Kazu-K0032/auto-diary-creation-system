@@ -4,30 +4,41 @@
 
 ## 概要
 
-Notion の更新ページを収集し、OpenAI で要約して、日次の要約ページを Notion の日記データベースへ自動作成する Google Apps Script（GAS）プロジェクトです。
+過去24時間以内で行われたNotionの新規・更新ドキュメントを収集し、その日の学習や考えたことを日記としてNotionの日記データベースに作成するシステム
 
-主な処理の流れ:
+## 背景
 
-1. 直近24時間で更新された Notion ページを取得
-2. 各ページ本文を抽出して OpenAI で要約
-3. 要約一覧を Notion の日記DBに1ページとして作成
-4. エラー発生時は LINE へ通知
+私は日々、Notionでドキュメントを作成している。ドキュメントの内容は、技術学習・日記やTodo・自己分析・旅行プランなど様々である。広い領域で作成しているドキュメントを中心に日記をつけることで、手動で日記を書かずとも日記を書く本質的な「過去の思い出しのきっかけ」を作れると考えた。
+
+## 主な処理の流れ
+
+1. 過去24時間で新規作成・更新されたNotionドキュメントを取得
+2. 各ページ本文を抽出してOpenAIで要約
+3. 要約内容をフォーマットに沿って整形
+    - フォーマット: `docs/diary-format/format.md`
+    - 日記の例: `docs/diary-format/format-ex.md`
+4. 内容をNotionの日記データベースにドキュメントとして追加（システムはここで終了）
+5. 処理中にエラーが発生した時はLINEへ通知
 
 ## セットアップ
 
 ### 1. Notion 側の準備
 
-1. Internal Integration を作成し、トークンを取得
-2. 日記を書き込む対象DBに Integration を接続（Share / Add connections）
-3. 対象DBのタイトル列名を確認（`DIARY_TITLE_PROPERTY` と一致させる）
+1. Notionインテグレーションを作成
+    - 内部インテグレーションシークレットを取得
+    - 機能は「コンテンツを読み取る」「コンテンツを挿入」にチェック
+    - 「アクセス」タブから読み取りたいデータベースまたはトップレベルのページを選択する(トップレベルページの場合は内部のDBなど再帰的に読み取ってくれるのでおすすめ)
+2. 日記DBの用意
+    - 作成していない場合は作成
+    - ドキュメントを作成するカラムの名前を取得し、`DIARY_TITLE_PROPERTY`に設定する(デフォルトは`ドキュメント`)
 
 ### 2. Script Properties の設定
 
 GASエディタの「プロジェクトの設定 > スクリプト プロパティ」に以下を登録します。
 
-- `NOTION_TOKEN`
-- `OPENAI_API_KEY`
-- `LINE_API`
+- `NOTION_TOKEN`: 内部インテグレーションシークレット
+- `OPENAI_API_KEY`: OpenAI API
+- `LINE_API`: Messaging API(チャネルアクセストークン)
 
 ### 3. 定数の確認（`Config.js`）
 
@@ -49,11 +60,11 @@ clasp push
 
 ### 手動実行
 
-GASエディタで `_main.js` の `main()` を実行します。
+GASエディタで `_main.js` の `main()` を実行する
 
 ### 定期実行
 
-GASのトリガー設定で `main` を時間主導トリガーに登録します（例: 毎日1回）。
+GASのトリガー設定で `main` を時間主導トリガーに登録（例: 毎日1回）
 
 ## ログと通知
 
@@ -65,13 +76,15 @@ GASのトリガー設定で `main` を時間主導トリガーに登録します
 
 ### Notion 400: `Name is not a property that exists`
 
-- `DIARY_TITLE_PROPERTY` が実際のDBタイトル列名と一致していません。
+- `DIARY_TITLE_PROPERTY` が実際のDBタイトル列名と一致していないのが原因
+- 日記DBで設定している実際のカラム名に変更する
 
 ### Notion 403: `Insufficient permissions for this endpoint`
 
-- Integration に書き込み権限がない、または対象DBに接続されていません。
+- Integration に書き込み権限がない、または対象DBに接続されていないのが原因
+- Notionインテグレーションに書き込み権限が追加されているか確認する。また日記DBのIDがシステムと合致しているか確認
 
 ### Script Properties 未設定
 
-- `Config.js` の初期化時に `スクリプトプロパティが未設定です: <KEY>` が発生します。
-- 対象キーを Script Properties に追加してください。
+- `Config.js`の初期化時に`スクリプトプロパティが未設定です: <KEY>`が発生するケース
+- 対象キーをScript Propertiesに追加すること

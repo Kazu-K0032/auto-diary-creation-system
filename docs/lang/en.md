@@ -4,30 +4,43 @@
 
 ## Overview
 
-This Google Apps Script (GAS) project collects recently updated Notion pages, summarizes them with OpenAI, and creates a daily summary page in a Notion diary database.
+This system collects Notion documents created/updated within the last 24 hours, summarizes them with OpenAI, and creates a “diary entry” in a Notion diary database based on what you learned and thought that day.
 
-Main flow:
+## Background
+
+I create documents in Notion every day—technical learning notes, diary/TODOs, self-reflection, travel plans, and more. By keeping a diary centered around those documents, I can create the essential “trigger to recall the past” without manually writing a diary entry.
+
+## Main Flow
 
 1. Fetch pages updated in the last 24 hours from Notion
 2. Extract page content and summarize it with OpenAI
-3. Create one daily summary page in the Notion diary database
-4. Send a LINE notification if an error occurs
+3. Format the content according to the diary template
+   - Template: `docs/diary-format/format.md`
+   - Example: `docs/diary-format/format-ex.md`
+4. Append the formatted content as a document in the Notion diary database (the system ends here)
+5. Send a LINE notification if an error occurs during processing
 
 ## Setup
 
 ### 1. Prepare Notion
 
-1. Create a Notion Internal Integration and get the token
-2. Connect the integration to your target diary database (Share / Add connections)
-3. Confirm the title property name in the target DB (must match `DIARY_TITLE_PROPERTY`)
+1. Create a Notion Integration
+   - Get the Internal Integration Secret
+   - Enable the capabilities “Read content” and “Insert content”
+   - In the “Access” tab, select the database(s) or a top-level page you want to read  
+     (Selecting a top-level page is recommended, since Notion can read databases under it recursively)
+2. Prepare your diary database
+   - Create it if you haven’t yet
+   - Find the column name used for the page title, and set it to `DIARY_TITLE_PROPERTY`  
+     (default: `ドキュメント`)
 
 ### 2. Set Script Properties
 
 In GAS editor, open Project Settings and add these Script Properties:
 
-- `NOTION_TOKEN`
-- `OPENAI_API_KEY`
-- `LINE_API`
+- `NOTION_TOKEN`: Internal Integration Secret
+- `OPENAI_API_KEY`: OpenAI API key
+- `LINE_API`: LINE Messaging API (Channel Access Token)
 
 ### 3. Review constants in `Config.js`
 
@@ -66,10 +79,13 @@ Create a time-driven trigger for `main` (for example, once per day).
 ### Notion 400: `Name is not a property that exists`
 
 - `DIARY_TITLE_PROPERTY` does not match the actual title property name in your Notion DB.
+- Update it to the real column name used in your diary database.
 
 ### Notion 403: `Insufficient permissions for this endpoint`
 
 - The integration does not have write permissions, or it is not connected to the target DB.
+- Verify the integration has “Insert content” enabled, and it is connected to the diary DB.
+- Also verify `DIARY_DB_ID` matches the actual diary DB you intended to write to.
 
 ### Missing Script Properties
 
